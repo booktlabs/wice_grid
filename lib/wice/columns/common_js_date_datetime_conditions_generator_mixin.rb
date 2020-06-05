@@ -3,6 +3,9 @@ module Wice
     module CommonJsDateDatetimeConditionsGeneratorMixin #:nodoc:
 
       def generate_conditions(table_alias, opts)   #:nodoc:
+        # For some cases this method was invoked with opts = ''
+        # e.g using a saved query and changing a page
+        return false unless opts.is_a?(Hash)
 
         datetime = @column_type == :datetime || @column_type == :timestamp
 
