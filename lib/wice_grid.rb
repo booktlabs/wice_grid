@@ -105,7 +105,13 @@ module Wice
 
       begin
         # options that are understood
+        #
+        # `impermanent_conditions` is added for bookt-backend
+        # it's conditions are added to the resultset, but are not persisted to saved_query
+        # (it's temporary filter)
+        # It can be nil and all will work as it used to
         @options = {
+          impermanent_conditions:     nil,
           conditions:                 nil,
           csv_file_name:              nil,
           csv_field_separator:        ConfigurationProvider.value_for(:CSV_FIELD_SEPARATOR),
@@ -167,6 +173,7 @@ module Wice
       @status[:page]          = @options[:page]
       @status[:conditions]    = @options[:conditions]
       @status[:f]             = @options[:f]
+      @status[:impermanent_conditions] = @options[:impermanent_conditions]
 
       process_loading_query
       process_params
@@ -350,6 +357,14 @@ module Wice
       return relation
     end
 
+    # wice_grid restores params from a saved_query.
+    # q=>13 turns into tags.tag = ['qwe', 'eee']
+    # We need these final tags to create some extra conditions thath wice_grid can't make by itself
+    # Like adding subqueries
+    def add_conditions(conditions)
+      @relation = @relation.merge(conditions)
+    end
+
     # TO DO: what to do with other @ar_options values?
     def read  #:nodoc:
       form_ar_options
@@ -360,6 +375,12 @@ module Wice
                        .merge(@ar_options[:conditions])
         relation = relation.group(@ar_options[:group]) if @ar_options[:group].present?
         relation = add_references relation
+
+        # custom behaviour for bookt / snapcast-backend:
+        # This must happen before pagination and merging in impermanent_conditions
+        save_saved_query_sql(relation)
+        relation = relation.merge(@status[:impermanent_conditions]) if @status[:impermanent_conditions]
+
         relation = apply_sort_by relation
 
         # If relation is an Array, it got the sort from apply_sort_by.
@@ -387,6 +408,15 @@ module Wice
     end
 
     # core workflow methods END
+
+    def save_saved_query_sql(relation)
+      saved_query_present = !@saved_query.nil? && @saved_query.respond_to?(:sql)
+      if saved_query_present && (@saved_query.sql.nil? || Time.now - @saved_query.updated_at > 1.day)
+        # This select is required if we want to restore the relation with .find_by_sql
+        all_klass_fields = complete_column_name('*')
+        @saved_query.update sql: relation.reselect(all_klass_fields).to_sql
+      end
+    end
 
     # Getters
 
