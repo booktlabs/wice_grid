@@ -97,7 +97,8 @@ module Wice
         sorting_dependant_row_cycling:  false,
         html:                           {},
         upper_pagination_panel:         Defaults::SHOW_UPPER_PAGINATION_PANEL,
-        pagination_theme:               ConfigurationProvider.value_for(:PAGINATION_THEME)
+        pagination_theme:               ConfigurationProvider.value_for(:PAGINATION_THEME),
+        perform_rendering:              true
       }
 
       opts.assert_valid_keys(options.keys)
@@ -114,14 +115,16 @@ module Wice
       reuse_last_column_for_filter_buttons =
         Defaults::REUSE_LAST_COLUMN_FOR_FILTER_ICONS && rendering.last_column_for_html.capable_of_hosting_filter_related_icons?
 
-      if grid.output_csv?
-        grid_csv(grid, rendering)
-      else
-        # If blank_slate is defined we don't show any grid at all
-        if rendering.blank_slate_handler && grid.resultset.size == 0 && !grid.filtering_on?
-          generate_blank_slate(grid, rendering)
+      if options[:perform_rendering]
+        if grid.output_csv?
+          grid_csv(grid, rendering)
         else
-          grid_html(grid, options, rendering, reuse_last_column_for_filter_buttons)
+          # If blank_slate is defined we don't show any grid at all
+          if rendering.blank_slate_handler && grid.resultset.size == 0 && !grid.filtering_on?
+            generate_blank_slate(grid, rendering)
+          else
+            grid_html(grid, options, rendering, reuse_last_column_for_filter_buttons)
+          end
         end
       end
 
